@@ -136,11 +136,14 @@ table.e tfoot td{border-top:2px solid var(--border);font-weight:600;background:v
     <div><h1>ØKONOMI_DASHBOARD</h1></div>
     <div class="hdr-right">
       <span class="tag">Team Helse · 2025–2026</span>
+      <button class="load-btn" onclick="importJSON()">Importer</button>
+      <button class="load-btn" onclick="exportJSON()">Eksporter</button>
       <button class="load-btn" onclick="loadData()">Last inn</button>
       <button class="save-btn" onclick="saveData()">Lagre</button>
     </div>
   </div>
   <div id="toast" class="toast"></div>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
 
   <div class="tabs">
     <button class="tab active" onclick="go('p_ov',this)">Oversikt</button>
@@ -384,6 +387,33 @@ function loadData(){
   $('l1b').value=L.l1b;$('l2o').value=L.l2o;$('l2x').value=L.l2x;$('lr').value=L.lr;
   $('lt').value=L.lt;$('l1p').value=L.l1p;$('l2p').value=L.l2p;$('lf').value=L.lf;
   renderAll();toast('Data lastet inn');
+}
+function exportJSON(){
+  STATE.income={helene:pn($('iH').value),petter:pn($('iP').value)};
+  STATE.loan={l1b:pn($('l1b').value),l2o:pn($('l2o').value),l2x:pn($('l2x').value),
+    lr:pn($('lr').value),lt:pn($('lt').value),l1p:pn($('l1p').value),l2p:pn($('l2p').value),lf:pn($('lf').value)};
+  const blob=new Blob([JSON.stringify(STATE,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='teamhelse_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+  toast('Eksportert som JSON');
+}
+function importJSON(){$('importFile').click()}
+function handleImport(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      STATE=JSON.parse(ev.target.result);
+      $('iH').value=STATE.income.helene;$('iP').value=STATE.income.petter;
+      const L=STATE.loan;
+      $('l1b').value=L.l1b;$('l2o').value=L.l2o;$('l2x').value=L.l2x;$('lr').value=L.lr;
+      $('lt').value=L.lt;$('l1p').value=L.l1p;$('l2p').value=L.l2p;$('lf').value=L.lf;
+      renderAll();toast('Data importert fra fil');
+    }catch(err){toast('Feil: ugyldig JSON-fil')}
+  };
+  r.readAsText(f);e.target.value='';
 }
 
 /* ═══ BUDGET TAB ═══ */
