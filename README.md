@@ -127,6 +127,21 @@ table.e tfoot td{border-top:2px solid var(--border);font-weight:600;background:v
 .ov-lc h4{font-size:11px;font-weight:600;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
 .ov-lc .big{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;margin-bottom:4px}
 .ov-lc .sm{font-size:10px;color:var(--dim)}
+
+/* ── PLAN ── */
+.phase{margin-bottom:28px}
+.phase-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.phase-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.phase-lbl{font-size:13px;font-weight:600}
+.plan-stack{display:flex;flex-direction:column;gap:8px}
+.plan-item{display:flex;align-items:flex-start;gap:12px;background:var(--raised);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s,opacity .15s;user-select:none}
+.plan-item:hover{border-color:var(--border-hi)}
+.plan-item.done{opacity:.5}
+.plan-item.done .pi-title{text-decoration:line-through;color:var(--dim)}
+.pi-chk{width:18px;height:18px;border-radius:5px;border:2px solid var(--muted);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all .15s}
+.pi-chk.on{background:var(--green);border-color:var(--green);color:#000}
+.pi-title{font-size:12px;font-weight:600;margin-bottom:3px}
+.pi-desc{font-size:11px;color:var(--dim);line-height:1.5}
 </style>
 </head>
 <body>
@@ -147,6 +162,7 @@ table.e tfoot td{border-top:2px solid var(--border);font-weight:600;background:v
     <button class="tab" onclick="go('p_reno',this)">Oppussing</button>
     <button class="tab" onclick="go('p_loan',this)">Lån</button>
     <button class="tab" onclick="go('p_bud',this)">Månedlig budsjett</button>
+    <button class="tab" onclick="go('p_plan',this)">Plan</button>
   </div>
 
   <!-- ════ OVERVIEW ════ -->
@@ -241,6 +257,26 @@ table.e tfoot td{border-top:2px solid var(--border);font-weight:600;background:v
       <div class="cbox"><h3>Fordeling Helene / Petter</h3><div class="cs">Faktiske utgifter denne måneden</div><canvas id="budSplit"></canvas></div>
     </div>
   </div>
+
+  <!-- ════ PLAN ════ -->
+  <div id="p_plan" class="panel">
+    <div class="isec">
+      <h3>Rentekalkulator</h3><div class="cs">Sammenlign rentekostnad ved ulike renter — basert på nåværende lånebalanse og terminbeløp</div>
+      <div class="igrid">
+        <div class="fld"><label>Nåværende rente (%)</label><input type="number" id="rc_cur" value="4.8" step="0.1" oninput="calcRente()"></div>
+        <div class="fld"><label>Sammenlign med (%)</label><input type="number" id="rc_new" value="4.5" step="0.1" oninput="calcRente()"></div>
+      </div>
+      <div class="cards" id="renteCards" style="margin-top:14px"></div>
+      <div class="cgrid" style="margin-top:0">
+        <div class="cbox"><h3>Akkumulert rentekostnad</h3><div class="cs">Over lånets løpetid ved ulike renter</div><canvas id="renteLineC"></canvas></div>
+        <div class="cbox"><h3>Månedlig rentekostnad vs. rente</h3><div class="cs">Første måneds rentekostnad (Lån 1 + Lån 2) ved ulike renter</div><canvas id="renteBarC"></canvas></div>
+      </div>
+    </div>
+    <div class="isec">
+      <h3>Finansiell plan</h3><div class="cs">Klikk for å markere som fullført · Lagres automatisk</div>
+      <div id="planList"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -308,11 +344,10 @@ let STATE={
     {name:'Princess',m:[125,0,0,0,0,0,0,0,0,0,0,0]},
   ],
   loan:{l1b:4594242,l2o:1600000,l2x:440000,lr:4.8,lt:348,l1p:23361,l2p:8165,lf:3500},
-  curMonth:0
+  curMonth:0,
+  plan:{}
 };
 
-// Prefill actual data from spreadsheets for months we have
-// June (index 5)
 STATE.budgets[5]=[
   {cat:'Boliglån Skagerrak',bH:5770,bP:6450,aH:5770,aP:6450},
   {cat:'Felleskostnader Smestad',bH:0,bP:3690,aH:0,aP:3690},
@@ -325,7 +360,6 @@ STATE.budgets[5]=[
   {cat:'Netflix',bH:0,bP:129,aH:0,aP:129},
   {cat:'HBO',bH:129,bP:0,aH:129,aP:0},
 ];
-// July (index 6)
 STATE.budgets[6]=[
   {cat:'Boliglån Skagerrak',bH:5770,bP:6450,aH:10200,aP:10200},
   {cat:'Felleskostnader Smestad',bH:0,bP:3690,aH:0,aP:3690},
@@ -339,7 +373,6 @@ STATE.budgets[6]=[
   {cat:'Netflix',bH:0,bP:129,aH:0,aP:129},
   {cat:'HBO',bH:129,bP:0,aH:129,aP:0},
 ];
-// February (index 1)
 STATE.budgets[1]=[
   {cat:'Boliglån Skagerrak',bH:5770,bP:11000,aH:23360,aP:0},
   {cat:'Felleskostnader Smestad',bH:0,bP:3966,aH:0,aP:4422},
@@ -352,7 +385,6 @@ STATE.budgets[1]=[
   {cat:'Netflix',bH:0,bP:129,aH:0,aP:129},
   {cat:'HBO',bH:129,bP:0,aH:129,aP:0},
 ];
-// March (index 2)
 STATE.budgets[2]=[
   {cat:'Boliglån Skagerrak',bH:5770,bP:11000,aH:23360,aP:0},
   {cat:'Felleskostnader Smestad',bH:0,bP:3966,aH:0,aP:4422},
@@ -379,6 +411,7 @@ function loadData(){
   const d=localStorage.getItem('teamhelse_dashboard');
   if(!d)return toast('Ingen lagrede data funnet');
   STATE=JSON.parse(d);
+  if(!STATE.plan)STATE.plan={};
   $('iH').value=STATE.income.helene;$('iP').value=STATE.income.petter;
   const L=STATE.loan;
   $('l1b').value=L.l1b;$('l2o').value=L.l2o;$('l2x').value=L.l2x;$('lr').value=L.lr;
@@ -407,11 +440,11 @@ function renderBudTable(){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td><button class="del" onclick="delBud(${ri})">×</button></td>
       <td><input value="${r.cat}" onchange="STATE.budgets[${mi}][${ri}].cat=this.value"></td>
-      <td><input class="ni" type="number" value="${r.bH||''}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].bH=pn(this.value);calcBud()"></td>
-      <td><input class="ni" type="number" value="${r.bP||''}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].bP=pn(this.value);calcBud()"></td>
-      <td><input class="ni" type="number" value="${r.aH||''}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].aH=pn(this.value);calcBud()" style="color:var(--green)"></td>
-      <td><input class="ni" type="number" value="${r.aP||''}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].aP=pn(this.value);calcBud()" style="color:var(--green)"></td>
-      <td class="tot" style="color:${d>=0?'var(--green)':'var(--red)'};">${d>=0?'+':''}${fmt(d)}</td>`;
+      <td><input class="ni" type="number" value="${r.bH||\'\'}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].bH=pn(this.value);calcBud()"></td>
+      <td><input class="ni" type="number" value="${r.bP||\'\'}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].bP=pn(this.value);calcBud()"></td>
+      <td><input class="ni" type="number" value="${r.aH||\'\'}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].aH=pn(this.value);calcBud()" style="color:var(--green)"></td>
+      <td><input class="ni" type="number" value="${r.aP||\'\'}" placeholder="0" oninput="STATE.budgets[${mi}][${ri}].aP=pn(this.value);calcBud()" style="color:var(--green)"></td>
+      <td class="tot" style="color:${d>=0?'var(--green)':'var(--red)'};"> ${d>=0?'+':''}${fmt(d)}</td>`;
     tb.appendChild(tr);
   });
   budFoot();
@@ -424,13 +457,12 @@ function budFoot(){
   $('budF').innerHTML=`<tr><td></td><td style="font-weight:600">Sum</td>
     <td class="tot">${fmt(s.bH)}</td><td class="tot">${fmt(s.bP)}</td>
     <td class="tot" style="color:var(--green)">${fmt(s.aH)}</td><td class="tot" style="color:var(--green)">${fmt(s.aP)}</td>
-    <td class="tot" style="color:${d>=0?'var(--green)':'var(--red)'};">${d>=0?'+':''}${fmt(d)}</td></tr>`;
+    <td class="tot" style="color:${d>=0?'var(--green)':'var(--red)'};"> ${d>=0?'+':''}${fmt(d)}</td></tr>`;
 }
 function addBudRow(){STATE.budgets[STATE.curMonth].push({cat:'Ny utgift',bH:0,bP:0,aH:0,aP:0});renderBudTable();calcBud()}
 function delBud(i){STATE.budgets[STATE.curMonth].splice(i,1);renderBudTable();calcBud()}
 function copyToAll(){
   const src=JSON.parse(JSON.stringify(STATE.budgets[STATE.curMonth]));
-  // Copy budget columns only, reset actuals
   for(let i=0;i<12;i++){
     if(i===STATE.curMonth)continue;
     STATE.budgets[i]=src.map(r=>({cat:r.cat,bH:r.bH,bP:r.bP,aH:STATE.budgets[i].find(x=>x.cat===r.cat)?.aH||0,aP:STATE.budgets[i].find(x=>x.cat===r.cat)?.aP||0}));
@@ -445,7 +477,7 @@ function calcBud(){
   const s={bH:0,bP:0,aH:0,aP:0};
   rows.forEach(r=>{s.bH+=r.bH;s.bP+=r.bP;s.aH+=r.aH;s.aP+=r.aP});
   const bt=s.bH+s.bP,at=s.aH+s.aP;
-  const expSaldo=inc-bt,actSaldo=inc-at;
+  const actSaldo=inc-at;
 
   $('budCards').innerHTML=`
     <div class="card c-bl"><div class="lbl">Inntekt</div><div class="val">${fmt(inc)}</div></div>
@@ -455,7 +487,6 @@ function calcBud(){
 
   budFoot();renderPills();
 
-  // Year chart
   const yrBud=[],yrAct=[];
   for(let i=0;i<12;i++){
     let b=0,a=0;STATE.budgets[i].forEach(r=>{b+=r.bH+r.bP;a+=r.aH+r.aP});
@@ -468,7 +499,6 @@ function calcBud(){
   ]},options:{responsive:true,plugins:{legend:{position:'bottom'}},
     scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false}}}}});
 
-  // Saldo chart
   const saldos=MN.map((_,i)=>{let a=0;STATE.budgets[i].forEach(r=>{a+=r.aH+r.aP});return inc-a});
   if(budSaldoC)budSaldoC.destroy();
   budSaldoC=new Chart($('budSaldo'),{type:'bar',data:{labels:MN,datasets:[{label:'Saldo',data:saldos,
@@ -476,7 +506,6 @@ function calcBud(){
     options:{responsive:true,plugins:{legend:{display:false}},
       scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false}}}}});
 
-  // Split
   if(budSplitC)budSplitC.destroy();
   budSplitC=new Chart($('budSplit'),{type:'doughnut',data:{labels:['Helene','Petter'],
     datasets:[{data:[s.aH,s.aP],backgroundColor:['#8a6ae0','#4a8df0'],borderWidth:0,spacing:2}]},
@@ -494,7 +523,7 @@ function renderRenoTbl(){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td><button class="del" onclick="delReno(${i})">×</button></td>
       <td><input value="${r.name}" onchange="STATE.reno[${i}].name=this.value;calcReno()"></td>
-      ${r.m.map((v,mi)=>`<td><input class="ni" type="number" value="${v||''}" placeholder="0" oninput="STATE.reno[${i}].m[${mi}]=pn(this.value);calcReno()"></td>`).join('')}
+      ${r.m.map((v,mi)=>`<td><input class="ni" type="number" value="${v||\'\'}" placeholder="0" oninput="STATE.reno[${i}].m[${mi}]=pn(this.value);calcReno()"></td>`).join('')}
       <td class="tot">${fmt(t)}</td>`;
     tb.appendChild(tr);
   });
@@ -610,7 +639,6 @@ function updateOv(){
   const inc=pn($('iH').value)+pn($('iP').value);
   const L=STATE.loan;const l2b=L.l2o-L.l2x;const mr=L.lr/100/12;
 
-  // Budget totals per month
   const yrBud=[],yrAct=[],saldos=[];
   for(let i=0;i<12;i++){
     let b=0,a=0;STATE.budgets[i].forEach(r=>{b+=r.bH+r.bP;a+=r.aH+r.aP});
@@ -619,12 +647,10 @@ function updateOv(){
   const totalYrAct=yrAct.reduce((a,b)=>a+b,0);
   const totalYrBud=yrBud.reduce((a,b)=>a+b,0);
 
-  // Reno
   const renoGrand=STATE.reno.reduce((s,r)=>s+r.m.reduce((a,b)=>a+b,0),0);
   const mt=MN.map((_,mi)=>STATE.reno.reduce((s,r)=>s+r.m[mi],0));
   let acc=0;const accumulated=mt.map(v=>{acc+=v;return acc});
 
-  // Loan
   const a2=amor(l2b,L.l2p,mr,600);
 
   $('ovCards').innerHTML=`
@@ -635,14 +661,12 @@ function updateOv(){
     <div class="card c-te"><div class="lbl">Årlig budsjett</div><div class="val">${fmt(totalYrBud)}</div></div>
     <div class="card c-pu"><div class="lbl">Årlig regnskap</div><div class="val">${fmt(totalYrAct)}</div></div>`;
 
-  // Loan mini section
   $('ovLoan').innerHTML=`
     <div class="ov-lc"><h4>Lån 1</h4><div class="big">${fmt(L.l1b)}</div><div class="sm">Terminbeløp ${fmt(L.l1p)} kr/mnd · ${(L.lt/12).toFixed(0)} år</div></div>
     <div class="ov-lc"><h4>Lån 2 (etter innbet.)</h4><div class="big">${fmt(l2b)}</div><div class="sm">Terminbeløp ${fmt(L.l2p)} kr/mnd · ~${(a2.mo/12).toFixed(0)} år</div></div>
     <div class="ov-lc"><h4>Rente</h4><div class="big">${L.lr} %</div><div class="sm">Nominell · ${(L.lr*1.0389).toFixed(2)} % effektiv (ca.)</div></div>
     <div class="ov-lc"><h4>Fars bidrag</h4><div class="big pos">${fmt(L.lf)}</div><div class="sm">kr/mnd til Lån 2</div></div>`;
 
-  // Monthly chart
   if(ovMC)ovMC.destroy();
   ovMC=new Chart($('ovMonthly'),{type:'bar',data:{labels:MN,datasets:[
     {label:'Budsjett',data:yrBud,backgroundColor:'rgba(74,141,240,.4)',borderRadius:3},
@@ -650,14 +674,12 @@ function updateOv(){
   ]},options:{responsive:true,plugins:{legend:{position:'bottom'}},
     scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false}}}}});
 
-  // Saldo
   if(ovSC)ovSC.destroy();
   ovSC=new Chart($('ovSaldo'),{type:'bar',data:{labels:MN,datasets:[{label:'Saldo',data:saldos,
     backgroundColor:saldos.map(v=>v>=inc?'rgba(101,107,136,.3)':v>=0?'rgba(56,196,132,.5)':'rgba(224,78,78,.5)'),borderRadius:3}]},
     options:{responsive:true,plugins:{legend:{display:false}},
       scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false}}}}});
 
-  // Reno accumulation
   if(ovRC)ovRC.destroy();
   ovRC=new Chart($('ovReno'),{type:'line',data:{labels:MN,datasets:[
     {label:'Akkumulert',data:accumulated,borderColor:'#e04e4e',backgroundColor:'rgba(224,78,78,.06)',fill:true,tension:.3,pointRadius:2,borderWidth:2},
@@ -665,7 +687,6 @@ function updateOv(){
   ]},options:{responsive:true,plugins:{legend:{position:'bottom'}},
     scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false}}}}});
 
-  // Loan mini chart
   if(ovLC)ovLC.destroy();
   const a2b=amor(l2b,L.l2p+L.lf,mr,600);
   const mx2=Math.max(a2.pts.length,a2b.pts.length);
@@ -677,12 +698,115 @@ function updateOv(){
     scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false},ticks:{maxTicksLimit:8}}}}});
 }
 
-/* ═══ INIT ═══ */
-function renderAll(){renderRenoTbl();calcReno();calcLoan();renderPills();renderBudTable();calcBud()}
+/* ═══ RENTEKALKULATOR ═══ */
+let renteLnC,renteBarChrt;
+function calcRente(){
+  const L=STATE.loan;
+  const l1b=L.l1b,l2b=L.l2o-L.l2x;
+  const curPct=pn($('rc_cur').value),newPct=pn($('rc_new').value);
+  const mr_cur=curPct/100/12,mr_new=newPct/100/12;
 
-// Try auto-load
+  const a1c=amor(l1b,L.l1p,mr_cur,600),a2c=amor(l2b,L.l2p,mr_cur,600);
+  const a1n=amor(l1b,L.l1p,mr_new,600),a2n=amor(l2b,L.l2p,mr_new,600);
+  const ti_cur=a1c.ti+a2c.ti,ti_new=a1n.ti+a2n.ti;
+  const savedTot=ti_cur-ti_new;
+  const intMo_cur=(l1b+l2b)*mr_cur,intMo_new=(l1b+l2b)*mr_new;
+  const savedMo=Math.round(intMo_cur-intMo_new);
+
+  $('renteCards').innerHTML=`
+    <div class="card c-am"><div class="lbl">Rentekostnad nå</div><div class="val">${fmt(Math.round(intMo_cur))}</div><div class="sub">kr/mnd ved ${curPct} %</div></div>
+    <div class="card c-gr"><div class="lbl">Rentekostnad ny rente</div><div class="val">${fmt(Math.round(intMo_new))}</div><div class="sub">kr/mnd ved ${newPct} %</div></div>
+    <div class="card c-te"><div class="lbl">Månedlig besparelse</div><div class="val ${savedMo>=0?'pos':'neg'}">${savedMo>=0?'+':''}${fmt(savedMo)}</div><div class="sub">kr/mnd</div></div>
+    <div class="card c-bl"><div class="lbl">Total besparelse</div><div class="val ${savedTot>=0?'pos':'neg'}">${fmt(savedTot)}</div><div class="sub">over løpetid</div></div>`;
+
+  const maxMo=L.lt;
+  const yrlabels=Array.from({length:Math.floor(maxMo/12)+1},(_,i)=>i%5===0?i+'år':'');
+  const scenarios=[
+    {r:newPct,lbl:newPct+' %',col:'#38c484',w:2.5},
+    {r:curPct,lbl:curPct+' %',col:'#4a8df0',w:2.5},
+    {r:curPct+0.5,lbl:(curPct+.5).toFixed(1)+' %',col:'#e04e4e',w:1.5},
+    {r:Math.max(curPct-0.5,.1),lbl:Math.max(curPct-.5,.1).toFixed(1)+' %',col:'#df9438',w:1.5},
+  ];
+  const datasets=scenarios.map(s=>{
+    const mr=s.r/100/12;
+    let b1=l1b,b2=l2b,ti=0;
+    const pts=[0];
+    for(let mo=1;mo<=maxMo;mo++){
+      const i1=b1*mr;ti+=i1;const pr1=Math.min(L.l1p-i1,b1);if(pr1>0)b1=Math.max(0,b1-pr1);
+      if(b2>0){const i2=b2*mr;ti+=i2;const pr2=Math.min(L.l2p-i2,b2);if(pr2>0)b2=Math.max(0,b2-pr2);}
+      if(mo%12===0)pts.push(Math.round(ti));
+    }
+    return{label:s.lbl,data:pts,borderColor:s.col,borderWidth:s.w,tension:.2,pointRadius:0,fill:false};
+  });
+  if(renteLnC)renteLnC.destroy();
+  renteLnC=new Chart($('renteLineC'),{type:'line',data:{labels:yrlabels,datasets},
+    options:{responsive:true,plugins:{legend:{position:'bottom'}},
+      scales:{y:{ticks:{callback:v=>(v/1e6).toFixed(1)+'M'},grid:GC},x:{grid:{display:false},ticks:{maxTicksLimit:8}}}}});
+
+  const rList=[3.0,3.5,4.0,4.5,4.8,5.0,5.5,6.0];
+  const intList=rList.map(r=>Math.round((l1b+l2b)*r/100/12));
+  if(renteBarChrt)renteBarChrt.destroy();
+  renteBarChrt=new Chart($('renteBarC'),{type:'bar',
+    data:{labels:rList.map(r=>r+'%'),datasets:[{data:intList,
+      backgroundColor:rList.map(r=>r<=newPct?'rgba(56,196,132,.55)':r<=curPct?'rgba(74,141,240,.55)':'rgba(224,78,78,.45)'),
+      borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)+' kr/mnd rente'}}},
+      scales:{y:{ticks:{callback:v=>fmt(v)},grid:GC},x:{grid:{display:false}}}}});
+}
+
+/* ═══ FINANSIELL PLAN ═══ */
+const PLAN_DEF=[
+  {phase:'Nå — 0–3 måneder',color:'#4a8df0',items:[
+    {id:'ref',title:'Refinansier med hytte som tilleggssikkerhet',
+     desc:'Kontakt Skagerrak — dokumenter samlet belåningsgrad ~60 %. Mål: rente under 75 %-terskelen. Potensiell besparelse 11 000–17 000 kr/år.'},
+    {id:'reno_stop',title:'Avslutt oppussingen',
+     desc:'Sett hard stopp for nye kjøp. Dere er ca. 3× over opprinnelig budsjett. Lukk kapitlet.'},
+  ]},
+  {phase:'Kort sikt — 3–12 måneder',color:'#38c484',items:[
+    {id:'buf',title:'Bygg buffer på 100 000–150 000 kr',
+     desc:'Likvid buffer i høyrentekonto før ekstra nedbetaling. Dekker ~2 måneder faste utgifter.'},
+    {id:'alt2b',title:'Kjør Alt 2B på Lån 2',
+     desc:'Fortsett med fars bidrag (3 500 kr/mnd). Når Lån 2 er nedbetalt, redirect 11 665 kr/mnd til Lån 1 eller sparing.'},
+  ]},
+  {phase:'Mellomlang sikt — 1–5 år',color:'#df9438',items:[
+    {id:'stud',title:'Planlegg frigjøring av studielånet (Petter)',
+     desc:'4 257 kr/mnd frigjøres når studielånet er nedbetalt. Sett datoen og planlegg omfordeling i god tid.'},
+    {id:'hytte_avklar',title:'Avklar fremtiden for hytteandelen',
+     desc:'Stabil 50 %-eierskap er forutsetning for tilleggspant. Diskuter planer om salg/kjøp med medeier.'},
+  ]},
+];
+
+function renderPlan(){
+  if(!STATE.plan)STATE.plan={};
+  const c=$('planList');c.innerHTML='';
+  PLAN_DEF.forEach(ph=>{
+    const wrap=document.createElement('div');
+    wrap.className='phase';
+    const itemsHtml=ph.items.map(it=>{
+      const done=!!STATE.plan[it.id];
+      return`<div class="plan-item${done?' done':''}" onclick="togglePlan('${it.id}')">
+        <div class="pi-chk${done?' on':''}">${done?'✓':''}</div>
+        <div><div class="pi-title">${it.title}</div><div class="pi-desc">${it.desc}</div></div>
+      </div>`;
+    }).join('');
+    wrap.innerHTML=`<div class="phase-hdr"><div class="phase-dot" style="background:${ph.color}"></div><span class="phase-lbl">${ph.phase}</span></div>
+      <div class="plan-stack">${itemsHtml}</div>`;
+    c.appendChild(wrap);
+  });
+}
+function togglePlan(id){
+  if(!STATE.plan)STATE.plan={};
+  STATE.plan[id]=!STATE.plan[id];
+  renderPlan();
+  localStorage.setItem('teamhelse_dashboard',JSON.stringify(STATE));
+}
+
+/* ═══ INIT ═══ */
+function renderAll(){renderRenoTbl();calcReno();calcLoan();renderPills();renderBudTable();calcBud();renderPlan();calcRente()}
+
 const saved=localStorage.getItem('teamhelse_dashboard');
 if(saved){try{STATE=JSON.parse(saved);
+  if(!STATE.plan)STATE.plan={};
   $('iH').value=STATE.income.helene;$('iP').value=STATE.income.petter;
   const L=STATE.loan;$('l1b').value=L.l1b;$('l2o').value=L.l2o;$('l2x').value=L.l2x;$('lr').value=L.lr;
   $('lt').value=L.lt;$('l1p').value=L.l1p;$('l2p').value=L.l2p;$('lf').value=L.lf;
